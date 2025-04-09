@@ -1,12 +1,13 @@
 # Data Collection and Analysis with Conversational AI in Next.js
 
-Collect and analyse data in post-call webhooks using Conversational AI and Next.js.
+Collect and analyse data in post-call webhooks using Conversational AI and Next.js running on Cloudflare Workers.
 
 ## Run locally
 
 ```
 pnpm i
-pnpm dev
+pnpm preview
+pnpm deploy
 ```
 
 ## Conversational AI agent configuration
