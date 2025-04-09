@@ -1,26 +1,38 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import crypto from "crypto";
+// import crypto from "node:crypto"; TODO: fix this
 import { ElevenLabsClient } from "elevenlabs";
-import { Redis } from "@upstash/redis";
 import { Resend } from "resend";
 import { EmailTemplate } from "@/components/email/post-call-webhook-email";
+import { getRequestContext } from "@cloudflare/next-on-pages";
+
+export const runtime = "edge";
+
+interface Env {
+  RESEND_API_KEY: string;
+  ELEVENLABS_API_KEY: string;
+  ELEVENLABS_CONVAI_WEBHOOK_SECRET: string;
+  ELEVENLABS_AGENT_ID: string;
+  RESEND_FROM_EMAIL: string;
+}
 
 // Initialize Redis
-const redis = Redis.fromEnv();
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const elevenLabsClient = new ElevenLabsClient({
-  apiKey: process.env.ELEVENLABS_API_KEY,
-});
+// const redis = Redis.fromEnv(); TODO: replace with durable objects
 
 export async function GET() {
   return NextResponse.json({ status: "webhook listening" }, { status: 200 });
 }
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.ELEVENLABS_CONVAI_WEBHOOK_SECRET; // Add this to your env variables
+  const env = getRequestContext().env as Env;
+  // Initialize Resend
+  const resend = new Resend(env.RESEND_API_KEY);
+
+  const elevenLabsClient = new ElevenLabsClient({
+    apiKey: env.ELEVENLABS_API_KEY,
+  });
+
+  const secret = env.ELEVENLABS_CONVAI_WEBHOOK_SECRET; // Add this to your env variables
   const { event, error } = await constructWebhookEvent(req, secret);
   if (error) {
     return NextResponse.json({ error: error }, { status: 401 });
@@ -30,7 +42,7 @@ export async function POST(req: NextRequest) {
     const { conversation_id, analysis, agent_id } = event.data;
 
     if (
-      agent_id === process.env.ELEVENLABS_AGENT_ID &&
+      agent_id === env.ELEVENLABS_AGENT_ID &&
       analysis.evaluation_criteria_results.all_data_provided?.result ===
         "success" &&
       analysis.data_collection_results.voice_description?.value
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest) {
         // Send email to user
         console.log("Sending email to", redisRes.email);
         await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL!,
+          from: env.RESEND_FROM_EMAIL!,
           to: redisRes.email,
           subject: "Your Conversational AI agent is ready to chat!",
           react: EmailTemplate({ agentId: agent.agent_id }),
@@ -99,8 +111,8 @@ const constructWebhookEvent = async (req: NextRequest, secret?: string) => {
   }
 
   const headers = signature_header.split(",");
-  const timestamp = headers.find(e => e.startsWith("t="))?.substring(2);
-  const signature = headers.find(e => e.startsWith("v0="));
+  const timestamp = headers.find((e) => e.startsWith("t="))?.substring(2);
+  const signature = headers.find((e) => e.startsWith("v0="));
 
   if (!timestamp || !signature) {
     return { event: null, error: "Invalid signature format" };
@@ -144,12 +156,16 @@ async function getRedisDataWithRetry(
 } | null> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const data = await redis.get(conversationId);
-      return data as any;
+      // const data = await redis.get(conversationId); TODO: replace with durable objects
+      // return data as any;
+      return {
+        email: "test@test.com",
+        knowledgeBase: [],
+      };
     } catch (error) {
       if (attempt === maxRetries) throw error;
       console.log(`Redis get attempt ${attempt} failed, retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   return null;
