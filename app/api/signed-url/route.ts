@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { ElevenLabsClient } from "elevenlabs";
+import { getRequestContext } from "@cloudflare/next-on-pages";
+
+export interface Env {
+  ELEVENLABS_AGENT_ID: string;
+  ELEVENLABS_API_KEY: string;
+}
+
+export const runtime = "edge";
 
 export async function GET() {
-  const agentId = process.env.ELEVENLABS_AGENT_ID;
+  const env = getRequestContext().env as Env;
+  const agentId = env.ELEVENLABS_AGENT_ID;
   if (!agentId) {
     throw Error("ELEVENLABS_AGENT_ID is not set");
   }
