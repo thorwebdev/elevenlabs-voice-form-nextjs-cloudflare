@@ -2,21 +2,16 @@
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { ElevenLabsClient } from "elevenlabs";
-import { getRequestContext } from "@cloudflare/next-on-pages";
+import { Redis } from "@upstash/redis";
 
 // Initialize Redis
-// const redis = Redis.fromEnv(); TODO: replace with durable objects
+const redis = Redis.fromEnv();
 
-export interface Env {
-  ELEVENLABS_API_KEY: string;
-}
+const elevenLabsClient = new ElevenLabsClient({
+  apiKey: process.env.ELEVENLABS_API_KEY,
+});
 
 export async function uploadFormData(formData: FormData) {
-  const env = getRequestContext().env as Env;
-  const elevenLabsClient = new ElevenLabsClient({
-    apiKey: env.ELEVENLABS_API_KEY,
-  });
-
   const knowledgeBase: Array<{
     id: string;
     type: "file" | "url";
@@ -60,11 +55,11 @@ export async function uploadFormData(formData: FormData) {
     }
 
     // Store knowledge base IDs and conversation ID in database.
-    // const redisRes = await redis.set(
-    //   conversationId as string,
-    //   JSON.stringify({ email, knowledgeBase })
-    // );
-    // console.log({ redisRes });
+    const redisRes = await redis.set(
+      conversationId as string,
+      JSON.stringify({ email, knowledgeBase })
+    );
+    console.log({ redisRes });
   });
 
   redirect("/success");
